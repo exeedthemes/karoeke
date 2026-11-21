@@ -1,8 +1,5 @@
-// Google Sheets & Google Forms Live Integration
-// 100% Zero-Firebase solution:
-// - Guests request songs via a Google Form / Google Page
-// - Submissions write to Google Sheets
-// - Host on localhost polls Google Sheets & plays karaoke on YouTube with pitch shift & votes sorting!
+// Google Sheets Integration Service
+// Professional Google Form & Google Sheet sync for Karaoke song requests
 
 import { sortQueueByVotes } from './firebase';
 import { extractYouTubeId, POPULAR_KARAOKE_SONGS } from './catalog';
@@ -29,7 +26,6 @@ export async function fetchGoogleSheetRequests(sheetId) {
     const res = await fetch(url);
     const text = await res.text();
 
-    // Google Visualization API returns: /*O_o*/ google.visualization.Query.setResponse({...});
     const jsonString = text.replace(/^[/*O_o*/\s]*google\.visualization\.Query\.setResponse\(/, '').replace(/\);?\s*$/, '');
     const data = JSON.parse(jsonString);
 
@@ -39,7 +35,7 @@ export async function fetchGoogleSheetRequests(sheetId) {
     const parsedRequests = [];
 
     // Parse each row from Google Form:
-    // [0] Timestamp, [1] Singer Name, [2] Song Title / YouTube link, [3] Solo or Open, [4] Pitch Shift, [5] Votes (optional)
+    // [0] Timestamp, [1] Singer Name, [2] Song Title / YouTube link, [3] Solo or Open, [4] Pitch Shift, [5] Votes
     rows.forEach((row, index) => {
       if (!row.c) return;
 
@@ -48,7 +44,7 @@ export async function fetchGoogleSheetRequests(sheetId) {
         return cell && cell.v !== null && cell.v !== undefined ? String(cell.v).trim() : '';
       };
 
-      const singer = getVal(1) || getVal(0) || `Guest Singer #${index + 1}`;
+      const singer = getVal(1) || getVal(0) || `Singer ${index + 1}`;
       const songInput = getVal(2) || getVal(1) || "Don't Stop Believin'";
       const modeRaw = (getVal(3) || 'solo').toLowerCase();
       const mode = modeRaw.includes('open') || modeRaw.includes('duet') ? 'open' : 'solo';
@@ -59,13 +55,11 @@ export async function fetchGoogleSheetRequests(sheetId) {
       const votesRaw = parseInt(getVal(5), 10);
       const votes = isNaN(votesRaw) ? 1 : Math.max(1, votesRaw);
 
-      // Match YouTube ID
       let ytId = extractYouTubeId(songInput);
       let title = songInput;
-      let artist = 'Karaoke Request';
+      let artist = 'Custom Request';
 
       if (!ytId) {
-        // Try catalog match
         const match = POPULAR_KARAOKE_SONGS.find(s => 
           songInput.toLowerCase().includes(s.title.toLowerCase()) || 
           s.title.toLowerCase().includes(songInput.toLowerCase())
@@ -75,7 +69,6 @@ export async function fetchGoogleSheetRequests(sheetId) {
           title = match.title;
           artist = match.artist;
         } else {
-          // Default to Queen Bohemian Rhapsody or Journey
           ytId = POPULAR_KARAOKE_SONGS[index % POPULAR_KARAOKE_SONGS.length].youtubeId;
           title = songInput;
         }
@@ -102,14 +95,33 @@ export async function fetchGoogleSheetRequests(sheetId) {
   }
 }
 
-// Generate CSV to download or paste directly into Google Sheets
+// Download a formatted starter Google Sheet template (CSV) with pre-configured columns
+export function downloadGoogleSheetTemplate() {
+  const headers = ['Timestamp', 'Singer Name', 'Song Title or YouTube URL', 'Performance Mode', 'Key Shift (Semitones)', 'Votes', 'Notes'];
+  const sampleRows = [
+    [new Date().toISOString(), 'Sarah Jenkins', "Don't Stop Believin' - Journey", 'Open Mic', '0', '4', 'Sing chorus together'],
+    [new Date().toISOString(), 'David Ross', 'Bohemian Rhapsody - Queen', 'Solo', '+1', '7', 'High energy'],
+    [new Date().toISOString(), 'Alex Kim', 'Rolling in the Deep - Adele', 'Open Mic', '-2', '3', 'Baritone key']
+  ];
+
+  const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...sampleRows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement('a');
+  link.setAttribute('href', encodedUri);
+  link.setAttribute('download', `karaoke_sheet_template.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// Generate CSV export of current queue
 export function exportQueueToCSV(queue = [], currentSong = null) {
   const headers = ['Order', 'Singer', 'Song Title', 'Artist', 'Mode (Solo/Open)', 'Pitch Shift (st)', 'Votes', 'Duet Partners', 'Time'];
   const rows = [];
   
   if (currentSong) {
     rows.push([
-      'NOW PLAYING',
+      'CURRENT',
       currentSong.singer || '',
       `"${(currentSong.title || '').replace(/"/g, '""')}"`,
       `"${(currentSong.artist || '').replace(/"/g, '""')}"`,
@@ -139,7 +151,7 @@ export function exportQueueToCSV(queue = [], currentSong = null) {
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement('a');
   link.setAttribute('href', encodedUri);
-  link.setAttribute('download', `karaoke_requests_${new Date().toISOString().slice(0, 10)}.csv`);
+  link.setAttribute('download', `karaoke_queue_export_${new Date().toISOString().slice(0, 10)}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

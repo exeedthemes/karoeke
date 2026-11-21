@@ -17,7 +17,12 @@ import {
   Share2, 
   Plus, 
   ExternalLink,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Video,
+  Globe,
+  TrendingUp,
+  SlidersHorizontal,
+  User
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import PitchControl from './PitchControl';
@@ -25,6 +30,7 @@ import Soundboard from './Soundboard';
 import StageAnnouncement from './StageAnnouncement';
 import FirebaseModal from './FirebaseModal';
 import GoogleSheetModal from './GoogleSheetModal';
+import VideoSelectorModal from './VideoSelectorModal';
 import { 
   updateRoomState, 
   playNextSong, 
@@ -42,19 +48,22 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
   const [showQrModal, setShowQrModal] = useState(false);
   const [showFirebaseModal, setShowFirebaseModal] = useState(false);
   const [showGoogleSheetModal, setShowGoogleSheetModal] = useState(false);
+  const [videoModalTarget, setVideoModalTarget] = useState(null); // song object to edit video for
+  const [showAddModal, setShowAddModal] = useState(false);
+
   const [googleSheetId, setGoogleSheetId] = useState(() => {
     return localStorage.getItem('singwave_sheet_id') || '';
   });
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
+  const [googleFormUrl, setGoogleFormUrl] = useState(() => {
+    return localStorage.getItem('singwave_form_url') || '';
+  });
+  const [qrMode, setQrMode] = useState(() => {
+    return localStorage.getItem('singwave_qr_mode') || 'github'; // 'github' | 'google'
+  });
+
+  const githubGuestUrl = 'https://exeedthemes.github.io/karoeke/?view=guest';
   const playerRef = useRef(null);
   const [playerReady, setPlayerReady] = useState(false);
-
-  const [customGuestUrl, setCustomGuestUrl] = useState(() => {
-    return localStorage.getItem('singwave_custom_guest_url') || 'https://exeedthemes.github.io/karoeke/?view=guest';
-  });
-  const [editingGuestUrl, setEditingGuestUrl] = useState(false);
-  const [tempGuestUrl, setTempGuestUrl] = useState('');
 
   const currentSong = roomData?.currentSong;
   const queue = roomData?.queue || [];
@@ -63,9 +72,15 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
   const isPlaying = roomData?.isPlaying || false;
   const showStageIntro = roomData?.showStageIntro || false;
 
-  // Generate mobile scanner QR code URL:
-  // Uses custom public URL (e.g. GitHub Pages or Google Form) if configured, else defaults to current origin
-  const guestUrl = customGuestUrl.trim() || `${window.location.origin}${window.location.pathname}?view=guest`;
+  // Active guest URL based on selected mode
+  const guestUrl = qrMode === 'google' && googleFormUrl.trim()
+    ? googleFormUrl.trim()
+    : githubGuestUrl;
+
+  const handleToggleQrMode = (mode) => {
+    setQrMode(mode);
+    localStorage.setItem('singwave_qr_mode', mode);
+  };
 
   useEffect(() => {
     QRCode.toDataURL(guestUrl, {
@@ -80,7 +95,7 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
       .catch((err) => console.error("QR Code error:", err));
   }, [guestUrl]);
 
-  // Periodic poll from Google Sheet if connected!
+  // Periodic poll from Google Sheet if connected
   useEffect(() => {
     if (!googleSheetId) return;
 
@@ -100,13 +115,21 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
     };
 
     syncSheet();
-    const interval = setInterval(syncSheet, 5000);
+    const interval = setInterval(syncSheet, 4000);
     return () => clearInterval(interval);
   }, [googleSheetId, roomData?.queue, roomId]);
 
-  const handleSaveSheetId = (id) => {
-    setGoogleSheetId(id);
-    localStorage.setItem('singwave_sheet_id', id);
+  const handleSaveSheetConfig = ({ sheetId, formUrl }) => {
+    if (sheetId) {
+      setGoogleSheetId(sheetId);
+      localStorage.setItem('singwave_sheet_id', sheetId);
+    }
+    if (formUrl) {
+      setGoogleFormUrl(formUrl);
+      localStorage.setItem('singwave_form_url', formUrl);
+      setQrMode('google');
+      localStorage.setItem('singwave_qr_mode', 'google');
+    }
   };
 
   // Setup / Update YouTube Player
@@ -204,10 +227,24 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
     updateRoomState(roomId, { playbackRate: rate });
   };
 
-  const copyGuestLink = () => {
-    navigator.clipboard.writeText(guestUrl);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
+  // Video switcher handler
+  const handleApplyVideo = (newVideoId) => {
+    if (!videoModalTarget) return;
+
+    if (currentSong && videoModalTarget.id === currentSong.id) {
+      // Update currently playing song
+      const updatedCurrent = { ...currentSong, youtubeId: newVideoId };
+      updateRoomState(roomId, { currentSong: updatedCurrent });
+      if (playerRef.current && playerRef.current.loadVideoById) {
+        playerRef.current.loadVideoById(newVideoId);
+      }
+    } else {
+      // Update song in queue
+      const updatedQueue = queue.map((s) =>
+        s.id === videoModalTarget.id ? { ...s, youtubeId: newVideoId } : s
+      );
+      updateRoomState(roomId, { queue: updatedQueue });
+    }
   };
 
   const toggleFullscreen = () => {
@@ -220,7 +257,7 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col stage-gradient">
-      {/* Stage Announcement Curtain / Modal */}
+      {/* Stage Announcement Curtain */}
       {showStageIntro && currentSong && (
         <StageAnnouncement
           song={currentSong}
@@ -236,7 +273,7 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
         />
       )}
 
-      {/* Top TV Header Bar */}
+      {/* Top Header Bar */}
       <header className="px-6 py-4 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3">
@@ -249,7 +286,7 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
                   SingWave <span className="text-pink-500 text-xs px-2 py-0.5 rounded-full bg-pink-500/10 border border-pink-500/30">STAGE</span>
                 </h1>
               </div>
-              <p className="text-xs text-slate-400">Live Karaoke Party & Song Request Engine</p>
+              <p className="text-xs text-slate-400">Professional Karaoke & Live Request Queue</p>
             </div>
           </div>
         </div>
@@ -261,7 +298,7 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
             <Soundboard />
           </div>
 
-          {/* Google Sheet / Form Sync Button */}
+          {/* Google Sheet Sync Button */}
           <button
             onClick={() => setShowGoogleSheetModal(true)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
@@ -272,7 +309,7 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
             <span className="hidden sm:inline">
-              {googleSheetId ? 'Google Sheet Active' : 'Google Sheet / Form'}
+              {googleSheetId ? 'Google Sheet Active' : 'Google Sheet & Form'}
             </span>
           </button>
 
@@ -297,7 +334,7 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 text-white text-xs font-bold shadow-md shadow-pink-500/20 hover:scale-105 transition"
           >
             <QrCode className="w-4 h-4" />
-            <span>Scan to Request</span>
+            <span>Show QR Code</span>
           </button>
 
           {/* Fullscreen toggle */}
@@ -332,30 +369,42 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
               <>
                 <div id="yt-player-container" className="w-full h-full" />
 
-                {/* Floating Singer & Mode HUD */}
-                <div className="absolute top-4 left-4 z-20 flex items-center gap-2 pointer-events-none">
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950/80 backdrop-blur-md border border-pink-500/40 text-xs font-bold text-white shadow-lg">
-                    <Mic className="w-3.5 h-3.5 text-pink-400" />
-                    <span>Singer: {currentSong.singer}</span>
+                {/* Floating Singer & Controls HUD */}
+                <div className="absolute top-4 left-4 right-4 z-20 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950/85 backdrop-blur-md border border-pink-500/40 text-xs font-bold text-white shadow-lg">
+                      <Mic className="w-3.5 h-3.5 text-pink-400" />
+                      <span>Singer: {currentSong.singer}</span>
+                    </div>
+
+                    {currentSong.mode === 'open' ? (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-cyan-950/85 backdrop-blur-md border border-cyan-500/40 text-xs font-bold text-cyan-300 shadow-lg">
+                        <Users className="w-3.5 h-3.5" />
+                        <span>Open Session</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-950/85 backdrop-blur-md border border-purple-500/40 text-xs font-bold text-purple-300 shadow-lg">
+                        <User className="w-3.5 h-3.5" />
+                        <span>Solo</span>
+                      </div>
+                    )}
+
+                    {activePitch !== 0 && (
+                      <div className="px-2.5 py-1.5 rounded-full bg-amber-950/85 backdrop-blur-md border border-amber-500/40 text-xs font-bold text-amber-300 shadow-lg">
+                        Pitch: {activePitch > 0 ? `+${activePitch}` : activePitch} st
+                      </div>
+                    )}
                   </div>
 
-                  {currentSong.mode === 'open' ? (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-cyan-950/80 backdrop-blur-md border border-cyan-500/40 text-xs font-bold text-cyan-300 shadow-lg">
-                      <Users className="w-3.5 h-3.5" />
-                      <span>Open Mic / Duet</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-950/80 backdrop-blur-md border border-purple-500/40 text-xs font-bold text-purple-300 shadow-lg">
-                      <Mic className="w-3.5 h-3.5" />
-                      <span>Solo</span>
-                    </div>
-                  )}
-
-                  {activePitch !== 0 && (
-                    <div className="px-2.5 py-1.5 rounded-full bg-amber-950/80 backdrop-blur-md border border-amber-500/40 text-xs font-bold text-amber-300 shadow-lg">
-                      Key: {activePitch > 0 ? `+${activePitch}` : activePitch} st
-                    </div>
-                  )}
+                  {/* Switch Video Button */}
+                  <button
+                    onClick={() => setVideoModalTarget(currentSong)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-950/85 hover:bg-slate-900 backdrop-blur-md border border-pink-500/50 text-xs font-bold text-pink-300 shadow-lg transition active:scale-95"
+                    title="Change YouTube Karaoke Video"
+                  >
+                    <Video className="w-3.5 h-3.5 text-pink-400" />
+                    <span>Select Karaoke Track</span>
+                  </button>
                 </div>
               </>
             ) : (
@@ -365,26 +414,26 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
                   <Mic className="w-10 h-10 text-pink-400" />
                 </div>
                 <h2 className="text-3xl font-black text-white font-display mb-2">
-                  The Stage is Ready!
+                  Stage Ready
                 </h2>
                 <p className="text-slate-400 text-sm mb-6">
-                  Scan the QR code to request your favorite song, choose solo or duet, and pick your pitch!
+                  Scan the QR code to request your favorite song, choose solo or duet, and pick your pitch.
                 </p>
 
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   {queue.length > 0 ? (
                     <button
                       onClick={handleNextSong}
-                      className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-600 text-white font-bold shadow-lg shadow-pink-500/30 hover:scale-105 transition"
+                      className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-600 text-white font-bold text-sm shadow-lg shadow-pink-500/30 hover:scale-105 transition"
                     >
-                      <Play className="w-5 h-5 fill-current" /> Start Queue ({queue.length} Songs Waiting)
+                      <Play className="w-4 h-4 fill-current" /> Start Queue ({queue.length} Songs Waiting)
                     </button>
                   ) : (
                     <button
                       onClick={() => setShowAddModal(true)}
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold border border-slate-700 transition"
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition"
                     >
-                      <Plus className="w-4 h-4" /> Pick a Starter Hit
+                      <Plus className="w-4 h-4" /> Add from Catalog
                     </button>
                   )}
                 </div>
@@ -399,7 +448,7 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
             <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl backdrop-blur-md flex flex-col justify-between">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                  Stage Controls
+                  Playback Controls
                 </div>
                 {currentSong && (
                   <span className="text-xs text-pink-400 font-medium truncate max-w-[200px]">
@@ -416,7 +465,7 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
                     }
                   }}
                   className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
-                  title="Restart Song"
+                  title="Restart Track"
                 >
                   <RotateCcw className="w-5 h-5" />
                 </button>
@@ -436,7 +485,7 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
                 <button
                   onClick={handleNextSong}
                   className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
-                  title="Next Song in Queue"
+                  title="Next Track"
                 >
                   <SkipForward className="w-5 h-5" />
                 </button>
@@ -445,10 +494,10 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
               <div className="text-center text-xs text-slate-400">
                 {currentSong ? (
                   <span>
-                    Singing: <strong className="text-white">{currentSong.singer}</strong> ({currentSong.mode === 'open' ? 'Open Mic' : 'Solo'})
+                    Current Singer: <strong className="text-white">{currentSong.singer}</strong> ({currentSong.mode === 'open' ? 'Open Session' : 'Solo'})
                   </span>
                 ) : (
-                  <span>No song currently playing</span>
+                  <span>No track in playback</span>
                 )}
               </div>
             </div>
@@ -467,7 +516,7 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
         {/* Right: QR Code & Live Queue */}
         <div className="lg:col-span-4 flex flex-col gap-4">
           
-          {/* Prominent QR Code Banner (clean, zero unnecessary PINs) */}
+          {/* Professional QR Code Banner */}
           <div className="bg-gradient-to-b from-slate-900 to-slate-900/90 border border-slate-800 rounded-3xl p-5 shadow-xl flex items-center gap-4">
             {qrCodeDataUrl ? (
               <img
@@ -482,55 +531,51 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
 
             <div className="flex-1 overflow-hidden">
               <div className="flex items-center gap-1.5 text-pink-400 font-bold text-xs uppercase tracking-wider mb-1">
-                <QrCode className="w-3.5 h-3.5" /> Scan To Sing
+                <QrCode className="w-3.5 h-3.5" /> Mobile Request
               </div>
-              <h3 className="text-lg font-black text-white leading-tight font-display">
-                Request on Phone
+              <h3 className="text-base font-bold text-white leading-tight font-display">
+                Scan with Phone Camera
               </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Scan with any smartphone camera to browse, vote & request songs!
-              </p>
+              
+              {/* QR Target Mode Toggle: ExeedThemes App vs Direct Google Form */}
+              <div className="mt-2.5 space-y-1">
+                <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                  <button
+                    onClick={() => handleToggleQrMode('github')}
+                    className={`flex-1 py-1 px-1.5 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1 ${
+                      qrMode === 'github'
+                        ? 'bg-pink-500 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Globe className="w-3 h-3" />
+                    <span>Web Portal</span>
+                  </button>
 
-              {/* Custom Guest Link (e.g. GitHub Pages or Google Form) */}
-              <div className="mt-2.5">
-                {editingGuestUrl ? (
-                  <div className="flex gap-1.5 mt-1">
-                    <input
-                      type="text"
-                      value={tempGuestUrl}
-                      onChange={(e) => setTempGuestUrl(e.target.value)}
-                      placeholder="Paste GitHub Pages or Form URL..."
-                      className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-[11px] text-white focus:outline-none focus:border-pink-500"
-                    />
-                    <button
-                      onClick={() => {
-                        setCustomGuestUrl(tempGuestUrl.trim());
-                        localStorage.setItem('singwave_custom_guest_url', tempGuestUrl.trim());
-                        setEditingGuestUrl(false);
-                      }}
-                      className="px-2.5 py-1 bg-pink-500 text-white rounded-lg text-xs font-bold"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => setEditingGuestUrl(false)}
-                      className="px-2 py-1 bg-slate-800 text-slate-400 rounded-lg text-xs"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ) : (
                   <button
                     onClick={() => {
-                      setTempGuestUrl(customGuestUrl);
-                      setEditingGuestUrl(true);
+                      if (!googleFormUrl) {
+                        setShowGoogleSheetModal(true);
+                      } else {
+                        handleToggleQrMode('google');
+                      }
                     }}
-                    className="text-[11px] text-slate-400 hover:text-pink-400 flex items-center gap-1 transition"
+                    className={`flex-1 py-1 px-1.5 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1 ${
+                      qrMode === 'google'
+                        ? 'bg-emerald-500 text-slate-950 shadow-sm font-black'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
                   >
-                    <span>Target: {customGuestUrl ? 'Custom (GitHub Pages)' : 'Local / Wi-Fi'}</span>
-                    <span className="text-pink-400 font-semibold underline">Edit Link</span>
+                    <FileSpreadsheet className="w-3 h-3" />
+                    <span>Google Form</span>
                   </button>
-                )}
+                </div>
+
+                <p className="text-[10px] text-slate-500 truncate">
+                  {qrMode === 'google'
+                    ? (googleFormUrl ? `Target: ${googleFormUrl}` : 'Configure Google Form')
+                    : 'Target: exeedthemes.github.io/karoeke'}
+                </p>
               </div>
             </div>
           </div>
@@ -548,7 +593,7 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
                 onClick={() => setShowAddModal(true)}
                 className="text-xs font-semibold text-pink-400 hover:text-pink-300 flex items-center gap-1 bg-pink-500/10 px-2.5 py-1 rounded-lg border border-pink-500/20"
               >
-                <Plus className="w-3.5 h-3.5" /> Add Song
+                <Plus className="w-3.5 h-3.5" /> Add Track
               </button>
             </div>
 
@@ -557,8 +602,8 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
               {queue.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 text-xs">
                   <Music2 className="w-8 h-8 mx-auto mb-2 opacity-40 text-slate-400" />
-                  <p>Queue is currently empty!</p>
-                  <p className="text-slate-400 mt-1">Scan QR code or click "Add Song" to load up the party!</p>
+                  <p>Queue is currently empty.</p>
+                  <p className="text-slate-400 mt-1">Scan QR code or click "Add Track" to load requests.</p>
                 </div>
               ) : (
                 queue.map((song, index) => {
@@ -588,7 +633,7 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
                             </h4>
                             {isTopVoted && (
                               <span className="text-[10px] font-black text-pink-400 bg-pink-500/20 px-1 rounded flex items-center gap-0.5">
-                                <Flame className="w-3 h-3 fill-current" /> Top Voted
+                                <TrendingUp className="w-3 h-3" /> Top Voted
                               </span>
                             )}
                           </div>
@@ -599,12 +644,12 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
 
                           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                             <span className="text-[10px] font-semibold text-pink-300 bg-pink-950/60 px-1.5 py-0.5 rounded border border-pink-900/50">
-                              🎤 {song.singer}
+                              {song.singer}
                             </span>
 
                             {isOpen ? (
                               <span className="text-[10px] font-semibold text-cyan-300 bg-cyan-950/60 px-1.5 py-0.5 rounded border border-cyan-900/50">
-                                👥 Open Mic ({song.votes || 1} votes)
+                                Open Session ({song.votes || 1} votes)
                               </span>
                             ) : (
                               <span className="text-[10px] font-semibold text-purple-300 bg-purple-950/60 px-1.5 py-0.5 rounded border border-purple-900/50">
@@ -623,6 +668,15 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
 
                       {/* Actions */}
                       <div className="flex items-center gap-1 shrink-0">
+                        {/* Change Video Button */}
+                        <button
+                          onClick={() => setVideoModalTarget(song)}
+                          className="p-1.5 text-slate-400 hover:text-pink-400 hover:bg-slate-700 rounded-lg transition"
+                          title="Select / Change YouTube Video"
+                        >
+                          <Video className="w-3.5 h-3.5" />
+                        </button>
+
                         <button
                           onClick={() => {
                             const remaining = queue.filter((_, i) => i !== index);
@@ -639,6 +693,7 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
                         >
                           <Play className="w-3.5 h-3.5 fill-current" />
                         </button>
+
                         <button
                           onClick={() => removeFromQueue(roomId, song.id)}
                           className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-slate-700 rounded-lg transition"
@@ -658,15 +713,15 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
 
       </div>
 
-      {/* Fullscreen Big QR Code Modal (Clean - No PINs) */}
+      {/* Fullscreen Big QR Code Modal */}
       {showQrModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4">
           <div className="relative max-w-sm w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center shadow-2xl">
             <h3 className="text-2xl font-black text-white font-display mb-1">
-              Scan to Request
+              Song Request QR Code
             </h3>
             <p className="text-xs text-slate-400 mb-6">
-              Use any smartphone camera to browse songs, vote & request
+              Scan with any smartphone camera to browse, vote & request songs.
             </p>
 
             <div className="bg-white p-4 rounded-3xl inline-block shadow-2xl mb-6">
@@ -675,7 +730,7 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
 
             <button
               onClick={() => setShowQrModal(false)}
-              className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition"
+              className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition text-sm"
             >
               Close
             </button>
@@ -689,7 +744,7 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
           <div className="relative max-w-xl w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-white font-display">
-                Add from Karaoke Catalog
+                Add from Verified Catalog
               </h3>
               <button
                 onClick={() => setShowAddModal(false)}
@@ -715,7 +770,7 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
                         title: song.title,
                         artist: song.artist,
                         youtubeId: song.youtubeId,
-                        singer: 'Host / Guest Pick',
+                        singer: 'Host Pick',
                         mode: 'open',
                         pitchShift: 0
                       });
@@ -732,12 +787,21 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
         </div>
       )}
 
+      {/* Video Selector Modal */}
+      <VideoSelectorModal
+        isOpen={!!videoModalTarget}
+        onClose={() => setVideoModalTarget(null)}
+        song={videoModalTarget}
+        onApplyVideo={handleApplyVideo}
+      />
+
       {/* Google Sheet Modal */}
       <GoogleSheetModal
         isOpen={showGoogleSheetModal}
         onClose={() => setShowGoogleSheetModal(false)}
         currentSheetId={googleSheetId}
-        onSaveSheetId={handleSaveSheetId}
+        currentFormUrl={googleFormUrl}
+        onSaveConfig={handleSaveSheetConfig}
         queue={queue}
         currentSong={currentSong}
       />

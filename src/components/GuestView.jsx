@@ -12,10 +12,12 @@ import {
   Video, 
   CheckCircle2, 
   ThumbsUp, 
-  Flame, 
   UserPlus,
   ArrowUpCircle,
-  Trophy
+  Trophy,
+  TrendingUp,
+  User,
+  FileSpreadsheet
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { 
@@ -31,13 +33,13 @@ import {
 import { playSound } from '../services/soundEffects';
 
 const PITCH_OPTIONS = [
-  { value: -4, label: '-4 st (Super Low)' },
+  { value: -4, label: '-4 st (Low)' },
   { value: -2, label: '-2 st (Lower Key)' },
   { value: -1, label: '-1 st (Slightly Low)' },
   { value: 0, label: '0 (Original Key)' },
   { value: 1, label: '+1 st (Slightly High)' },
   { value: 2, label: '+2 st (Higher Key)' },
-  { value: 4, label: '+4 st (Super High)' },
+  { value: 4, label: '+4 st (High)' },
 ];
 
 export default function GuestView({ roomData, roomId, onSwitchToHost }) {
@@ -46,7 +48,7 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
   const [singerName, setSingerName] = useState(() => {
     return localStorage.getItem('singwave_singer_name') || '';
   });
-  const [mode, setMode] = useState('open'); // default to open so crowd can vote!
+  const [mode, setMode] = useState('open'); // default to open so crowd can vote
   const [pitchShift, setPitchShift] = useState(0);
   const [note, setNote] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,11 +59,8 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
 
   const queue = roomData?.queue || [];
   const currentSong = roomData?.currentSong;
-
-  // Filter open songs
   const openSongs = queue.filter(s => s.mode === 'open');
 
-  // Persist singer name locally
   useEffect(() => {
     if (singerName.trim()) {
       localStorage.setItem('singwave_singer_name', singerName.trim());
@@ -79,7 +78,7 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
 
   const handleRequest = async (song) => {
     if (!singerName.trim()) {
-      alert('Please enter your name first!');
+      alert('Please enter your name to register the performance!');
       return;
     }
 
@@ -118,8 +117,8 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
     }
 
     const payload = {
-      title: customYoutubeUrl.includes('http') ? 'Custom YouTube Track' : customYoutubeUrl,
-      artist: 'Guest Choice',
+      title: customYoutubeUrl.includes('http') ? 'Custom YouTube Selection' : customYoutubeUrl,
+      artist: 'Guest Selection',
       youtubeId: ytid,
       singer: singerName.trim(),
       mode: mode,
@@ -154,14 +153,13 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
 
   const handleJoinDuet = async (songId) => {
     if (!singerName.trim()) {
-      alert('Please enter your name first to join the duet!');
+      alert('Please enter your name first to join this session!');
       return;
     }
     await joinDuet(roomId, songId, singerName.trim());
     playSound('cheer');
   };
 
-  // Find user's spot in queue
   const userQueueIndex = queue.findIndex(
     (s) => s.singer?.toLowerCase() === singerName.toLowerCase()
   );
@@ -169,7 +167,7 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col pb-12 selection:bg-pink-500">
       
-      {/* Mobile Header (Clean - Zero PINs) */}
+      {/* Mobile Header */}
       <header className="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-lg border-b border-slate-800 px-4 py-3">
         <div className="flex items-center justify-between max-w-md mx-auto w-full">
           <div className="flex items-center gap-2.5">
@@ -178,7 +176,7 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
             </div>
             <div>
               <span className="font-black text-white text-base tracking-tight font-display">SingWave</span>
-              <p className="text-[10px] text-slate-400">Song Request & Live Voting</p>
+              <p className="text-[10px] text-slate-400">Song Request & Voting Portal</p>
             </div>
           </div>
 
@@ -200,7 +198,7 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
                 : 'bg-slate-800/80 text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Music className="w-3.5 h-3.5" /> Request a Song
+            <Music className="w-3.5 h-3.5" /> Request Track
           </button>
 
           <button
@@ -211,7 +209,7 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
                 : 'bg-slate-800/80 text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Flame className="w-3.5 h-3.5 text-amber-400" /> Live Queue & Votes
+            <TrendingUp className="w-3.5 h-3.5 text-amber-400" /> Live Queue
             {queue.length > 0 && (
               <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-950 font-mono text-pink-400">
                 {queue.length}
@@ -229,9 +227,9 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
           <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/40 text-emerald-200 text-xs flex items-center gap-2.5 animate-in fade-in slide-in-from-top duration-300">
             <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
             <div>
-              <p className="font-bold text-white">Song Added to Queue!</p>
+              <p className="font-bold text-white">Track Added to Queue</p>
               <p className="text-[11px] text-emerald-300">
-                "{submittedSong.title}" is queued up! Get your vocal cords ready!
+                "{submittedSong.title}" is queued for playback.
               </p>
             </div>
           </div>
@@ -246,10 +244,10 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
               </div>
               <div>
                 <p className="font-bold text-white">
-                  {userQueueIndex === 0 ? "You're up NEXT on stage!" : `You are #${userQueueIndex + 1} in queue`}
+                  {userQueueIndex === 0 ? "You are next on stage" : `Position #${userQueueIndex + 1} in queue`}
                 </p>
                 <p className="text-[11px] text-pink-300">
-                  Approx {Math.max(1, userQueueIndex * 4)} mins until your turn
+                  Approx {Math.max(1, userQueueIndex * 4)} minutes remaining
                 </p>
               </div>
             </div>
@@ -265,7 +263,7 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-xl space-y-3">
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">
-                  1. Who is singing? (Your Name / Stage Alias)
+                  1. Singer Name
                 </label>
                 <div className="relative">
                   <Mic className="absolute left-3 top-3 w-4 h-4 text-pink-400" />
@@ -273,7 +271,7 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
                     type="text"
                     value={singerName}
                     onChange={(e) => setSingerName(e.target.value)}
-                    placeholder="e.g. Freddie, Sarah, Rocket Man"
+                    placeholder="Enter your name"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 transition"
                   />
                 </div>
@@ -295,10 +293,10 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
                     }`}
                   >
                     <div className="flex items-center gap-1.5 font-bold text-xs text-white">
-                      <Users className="w-3.5 h-3.5 text-cyan-400" /> Open Mic / Duet 🔥
+                      <Users className="w-3.5 h-3.5 text-cyan-400" /> Open Session
                     </div>
                     <span className="text-[10px] text-cyan-300/80">
-                      People can vote & bump to top!
+                      Guests can vote & join as duets
                     </span>
                   </button>
 
@@ -312,10 +310,10 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
                     }`}
                   >
                     <div className="flex items-center gap-1.5 font-bold text-xs text-white">
-                      <Mic className="w-3.5 h-3.5 text-purple-400" /> Solo Performance
+                      <User className="w-3.5 h-3.5 text-purple-400" /> Solo Performance
                     </div>
                     <span className="text-[10px] text-slate-400">
-                      Spotlight is just for you!
+                      Dedicated spotlight
                     </span>
                   </button>
                 </div>
@@ -325,7 +323,7 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-bold text-slate-300 flex items-center gap-1">
-                    <Sliders className="w-3.5 h-3.5 text-pink-400" /> 3. Pitch / Key Preference
+                    <Sliders className="w-3.5 h-3.5 text-pink-400" /> 3. Pitch / Key Adjustment
                   </label>
                   <span className="text-[11px] font-semibold text-pink-400">
                     {pitchShift === 0 ? 'Original Key' : `${pitchShift > 0 ? `+${pitchShift}` : pitchShift} Semitones`}
@@ -356,7 +354,7 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
                   type="text"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="Dedication / Note (e.g. 'Sing along on chorus!')"
+                  placeholder="Notes or dedication (optional)"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500"
                 />
               </div>
@@ -365,7 +363,7 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
             {/* Custom YouTube URL Paste Option */}
             <form onSubmit={handleCustomSubmit} className="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-xl space-y-2">
               <label className="block text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                <Video className="w-4 h-4 text-rose-400" /> Have a specific YouTube or YouTube Music song?
+                <Video className="w-4 h-4 text-rose-400" /> Custom YouTube Karaoke / Lyrics Link
               </label>
               <div className="flex gap-2">
                 <input
@@ -388,7 +386,7 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
             {/* Catalog Browser */}
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-xl space-y-3">
               <h3 className="text-sm font-bold text-white font-display">
-                Browse Popular Karaoke Classics
+                Browse Popular Karaoke Catalog
               </h3>
 
               {/* Search Bar */}
@@ -458,7 +456,7 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
             {currentSong ? (
               <div className="bg-gradient-to-r from-pink-950/40 to-slate-900 border border-pink-500/40 rounded-3xl p-4 shadow-xl glow-pink">
                 <div className="flex items-center gap-1.5 text-pink-400 text-xs font-bold uppercase tracking-wider mb-2">
-                  <Flame className="w-3.5 h-3.5" /> On Stage Now
+                  <TrendingUp className="w-3.5 h-3.5" /> In Playback
                 </div>
                 <h3 className="text-base font-bold text-white">
                   {currentSong.title}
@@ -469,12 +467,12 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
 
                 <div className="flex items-center gap-2 mt-3 flex-wrap">
                   <span className="text-xs font-bold text-pink-300 bg-pink-900/40 px-2.5 py-1 rounded-lg border border-pink-700/40">
-                    🎤 {currentSong.singer}
+                    {currentSong.singer}
                   </span>
 
                   {currentSong.mode === 'open' ? (
                     <span className="text-xs font-semibold text-cyan-300 bg-cyan-900/40 px-2 py-1 rounded-lg border border-cyan-700/40">
-                      👥 Open Mic
+                      Open Session
                     </span>
                   ) : (
                     <span className="text-xs font-semibold text-purple-300 bg-purple-900/40 px-2 py-1 rounded-lg border border-purple-700/40">
@@ -496,17 +494,17 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
                       onClick={() => handleJoinDuet(currentSong.id)}
                       className="mt-3 w-full py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-slate-950 font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5"
                     >
-                      <UserPlus className="w-4 h-4" /> Join as Duet Partner Right Now!
+                      <UserPlus className="w-4 h-4" /> Join as Duet Partner
                     </button>
                   )}
               </div>
             ) : (
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 text-center text-slate-400 text-xs">
-                Stage is open! Request a song to start!
+                Queue is open. Submit a song to begin.
               </div>
             )}
 
-            {/* Filter Toggle: Open Mic Voting vs All Songs */}
+            {/* Filter Toggle: Open Session Voting vs All Songs */}
             <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-2xl border border-slate-800">
               <button
                 onClick={() => setQueueFilter('open')}
@@ -516,7 +514,7 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <Flame className="w-3.5 h-3.5" /> Open Mic Voting ({openSongs.length})
+                <TrendingUp className="w-3.5 h-3.5" /> Open Sessions ({openSongs.length})
               </button>
               <button
                 onClick={() => setQueueFilter('all')}
@@ -530,23 +528,13 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
               </button>
             </div>
 
-            {/* Voting Explanation Banner */}
-            {queueFilter === 'open' && (
-              <div className="p-3 bg-cyan-950/40 border border-cyan-800/50 rounded-2xl text-[11px] text-cyan-200 flex items-center gap-2">
-                <ArrowUpCircle className="w-5 h-5 text-cyan-400 shrink-0" />
-                <span>
-                  Tap <strong>"Vote to Top! 🔥"</strong> on any open song to bump it to the #1 spot in the queue!
-                </span>
-              </div>
-            )}
-
             {/* Queue List */}
             <div className="space-y-2.5">
               {(queueFilter === 'open' ? openSongs : queue).length === 0 ? (
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center text-slate-400 text-xs">
                   {queueFilter === 'open'
-                    ? 'No open mic songs requested yet! Switch to Request and pick "Open Mic"!'
-                    : 'No songs in queue yet!'}
+                    ? 'No open sessions currently requested. Submit an Open Session track!'
+                    : 'No tracks currently in queue.'}
                 </div>
               ) : (
                 (queueFilter === 'open' ? openSongs : queue).map((song, idx) => {
@@ -572,18 +560,18 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
 
                           {isTopVoted && (
                             <span className="text-[10px] font-black uppercase text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-800 flex items-center gap-1">
-                              <Trophy className="w-3 h-3 text-amber-400" /> #1 Crowd Choice
+                              <Trophy className="w-3 h-3 text-amber-400" /> Most Requested
                             </span>
                           )}
                         </div>
 
-                        {/* Big Vote Button (Bumps to top!) */}
+                        {/* Professional Vote to Top Button */}
                         <button
                           onClick={() => handleVoteToTop(song.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 active:scale-95 text-white font-black text-xs shadow-md shadow-pink-500/25 transition hover:scale-105"
-                          title="Vote this song up to the top!"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 active:scale-95 text-white font-bold text-xs shadow-md shadow-pink-500/25 transition hover:scale-105"
+                          title="Vote this track to the top"
                         >
-                          <Flame className="w-3.5 h-3.5 fill-current" />
+                          <TrendingUp className="w-3.5 h-3.5" />
                           <span>Vote to Top ({song.votes || 1})</span>
                         </button>
                       </div>
@@ -599,12 +587,12 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
 
                       <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-slate-800/80">
                         <span className="text-[10px] font-bold text-pink-300 bg-pink-950/60 px-2 py-0.5 rounded border border-pink-900/50">
-                          🎤 {song.singer}
+                          {song.singer}
                         </span>
 
                         {isOpen ? (
                           <span className="text-[10px] font-semibold text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-900/50">
-                            👥 Open Mic / Duet
+                            Open Session
                           </span>
                         ) : (
                           <span className="text-[10px] font-semibold text-purple-300 bg-purple-950/60 px-2 py-0.5 rounded border border-purple-900/50">
@@ -614,7 +602,7 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
 
                         {song.pitchShift !== 0 && (
                           <span className="text-[10px] font-semibold text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-900/50">
-                            Key: {song.pitchShift > 0 ? `+${song.pitchShift}` : song.pitchShift} st
+                            Pitch: {song.pitchShift > 0 ? `+${song.pitchShift}` : song.pitchShift} st
                           </span>
                         )}
 
@@ -630,7 +618,7 @@ export default function GuestView({ roomData, roomId, onSwitchToHost }) {
 
                       {song.duetPartners?.length > 0 && (
                         <p className="text-[10px] text-cyan-300">
-                          👥 Co-singers: {song.duetPartners.join(', ')}
+                          Co-singers: {song.duetPartners.join(', ')}
                         </p>
                       )}
                     </div>

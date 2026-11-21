@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { FileSpreadsheet, ExternalLink, Check, Copy, HelpCircle, X, Sparkles, QrCode } from 'lucide-react';
-import { extractGoogleSheetId, exportQueueToCSV } from '../services/googleSheets';
+import { FileSpreadsheet, ExternalLink, Check, Copy, HelpCircle, X, QrCode, Download, PlusCircle } from 'lucide-react';
+import { extractGoogleSheetId, exportQueueToCSV, downloadGoogleSheetTemplate } from '../services/googleSheets';
 
 export default function GoogleSheetModal({ 
   isOpen, 
@@ -49,38 +49,49 @@ export default function GoogleSheetModal({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-white font-display">Google Sheets & Forms Mode</h2>
+              <h2 className="text-xl font-bold text-white font-display">Google Sheets & Forms Integration</h2>
               <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                Zero Firebase Needed
+                Direct Sync
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Guests scan to open your Google Form; responses sync straight to this host screen!
+              Collect song requests via Google Form or edit directly in a live Google Sheet.
             </p>
           </div>
         </div>
 
         {/* Tab switch */}
-        <div className="flex gap-2 border-b border-slate-800 pb-3 mb-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setActiveTab('connect')}
+              className={`text-xs font-bold px-3 py-1.5 rounded-lg transition ${
+                activeTab === 'connect'
+                  ? 'bg-emerald-500 text-slate-950'
+                  : 'text-slate-400 hover:text-white bg-slate-800'
+              }`}
+            >
+              Connect Sheet & Form
+            </button>
+            <button
+              onClick={() => setActiveTab('guide')}
+              className={`text-xs font-bold px-3 py-1.5 rounded-lg transition ${
+                activeTab === 'guide'
+                  ? 'bg-emerald-500 text-slate-950'
+                  : 'text-slate-400 hover:text-white bg-slate-800'
+              }`}
+            >
+              Setup Guide
+            </button>
+          </div>
+
           <button
-            onClick={() => setActiveTab('connect')}
-            className={`text-xs font-bold px-3 py-1.5 rounded-lg transition ${
-              activeTab === 'connect'
-                ? 'bg-emerald-500 text-slate-950'
-                : 'text-slate-400 hover:text-white bg-slate-800'
-            }`}
+            type="button"
+            onClick={downloadGoogleSheetTemplate}
+            className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-semibold"
+            title="Download CSV Template with predefined columns"
           >
-            Connect Form & Sheet
-          </button>
-          <button
-            onClick={() => setActiveTab('guide')}
-            className={`text-xs font-bold px-3 py-1.5 rounded-lg transition ${
-              activeTab === 'guide'
-                ? 'bg-emerald-500 text-slate-950'
-                : 'text-slate-400 hover:text-white bg-slate-800'
-            }`}
-          >
-            3-Minute Setup Guide
+            <Download className="w-3.5 h-3.5" /> Download Template CSV
           </button>
         </div>
 
@@ -89,7 +100,7 @@ export default function GoogleSheetModal({
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
                 <QrCode className="w-3.5 h-3.5 text-emerald-400" />
-                1. Google Form Link (What guests see when scanning QR code)
+                Google Form Link (Target for smartphone QR code)
               </label>
               <input
                 type="text"
@@ -99,14 +110,14 @@ export default function GoogleSheetModal({
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500"
               />
               <p className="text-[11px] text-slate-400 mt-1">
-                Your TV QR code will point straight to this Google Form so guests don't need any special app or local network access.
+                Your TV screen's QR code can point directly to this Google Form so guests need zero custom apps.
               </p>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
                 <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-                2. Linked Google Sheet URL (Where Form responses are saved)
+                Linked Google Sheet URL (Where Form responses land)
               </label>
               <input
                 type="text"
@@ -116,24 +127,25 @@ export default function GoogleSheetModal({
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500"
               />
               <p className="text-[11px] text-slate-400 mt-1">
-                Set Google Sheet sharing to <strong className="text-emerald-400">"Anyone with the link: Viewer"</strong>. The host screen will automatically check for new songs every 4 seconds.
+                Ensure sharing is set to <strong className="text-emerald-400">"Anyone with the link: Viewer"</strong>. The host screen will auto-refresh requests every 4 seconds.
               </p>
             </div>
 
             <div className="flex items-center justify-between pt-3 border-t border-slate-800">
-              <button
-                type="button"
-                onClick={() => exportQueueToCSV(queue, currentSong)}
-                className="text-xs text-slate-400 hover:text-emerald-400 flex items-center gap-1"
+              <a
+                href="https://sheets.new"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-slate-400 hover:text-white flex items-center gap-1"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5" /> Export current queue as CSV
-              </button>
+                <PlusCircle className="w-3.5 h-3.5 text-emerald-400" /> Open sheets.new
+              </a>
 
               <button
                 type="submit"
                 className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition shadow-lg shadow-emerald-500/20"
               >
-                Save & Start Live Sync
+                Save & Start Sync
               </button>
             </div>
           </form>
@@ -143,12 +155,12 @@ export default function GoogleSheetModal({
           <div className="space-y-3 text-xs text-slate-300 max-h-[350px] overflow-y-auto pr-1">
             <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
               <h4 className="font-bold text-white mb-1">Step 1: Create a Google Form</h4>
-              <p className="text-slate-400">Go to <a href="https://forms.google.com" target="_blank" rel="noreferrer" className="text-emerald-400 underline">forms.google.com</a> and add these 4 simple fields:</p>
+              <p className="text-slate-400">Go to <a href="https://forms.google.com" target="_blank" rel="noreferrer" className="text-emerald-400 underline">forms.google.com</a> and create 4 standard questions:</p>
               <ul className="list-disc list-inside mt-1.5 space-y-0.5 text-slate-300 font-mono text-[11px]">
-                <li>1. 👤 Your Name (Short answer)</li>
-                <li>2. 🎵 Song Title / YouTube Link (Short answer)</li>
-                <li>3. 👥 Solo or Open Mic? (Multiple Choice: "Solo" or "Open Mic")</li>
-                <li>4. 🎹 Pitch / Key (Multiple Choice: "-2 (Low)", "-1", "0 (Normal)", "+1", "+2 (High)")</li>
+                <li>1. Singer Name (Short answer)</li>
+                <li>2. Song Title / YouTube Link (Short answer)</li>
+                <li>3. Performance Mode (Multiple choice: "Solo" or "Open Mic")</li>
+                <li>4. Key Shift (Multiple choice: "-2", "-1", "0", "+1", "+2")</li>
               </ul>
             </div>
 
@@ -160,9 +172,9 @@ export default function GoogleSheetModal({
             </div>
 
             <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-              <h4 className="font-bold text-white mb-1">Step 3: Set Sharing to "Anyone with Link: Viewer"</h4>
+              <h4 className="font-bold text-white mb-1">Step 3: Enable Public Viewer Access</h4>
               <p className="text-slate-400">
-                Open that Google Sheet, click <strong className="text-white">Share</strong> (top right), set General access to <strong className="text-emerald-400">"Anyone with the link: Viewer"</strong>, and paste both the Form URL and Sheet URL into the tab!
+                In the Google Sheet, click <strong className="text-white">Share</strong> (top right), set General access to <strong className="text-emerald-400">"Anyone with the link: Viewer"</strong>, and paste the URL here.
               </p>
             </div>
           </div>
