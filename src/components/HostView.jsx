@@ -51,7 +51,7 @@ export default function HostView({ roomData, roomId, onSwitchToGuest, user }) {
   const [playerReady, setPlayerReady] = useState(false);
 
   const [customGuestUrl, setCustomGuestUrl] = useState(() => {
-    return localStorage.getItem('singwave_custom_guest_url') || '';
+    return localStorage.getItem('singwave_custom_guest_url') || 'https://exeedthemes.github.io/karoeke/?view=guest';
   });
   const [editingGuestUrl, setEditingGuestUrl] = useState(false);
   const [tempGuestUrl, setTempGuestUrl] = useState('');
